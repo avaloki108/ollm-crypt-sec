@@ -43,7 +43,9 @@
 - [Autocomplete and Prompt Features](#autocomplete-and-prompt-features)
 - [Configuration Management](#configuration-management)
 - [Server Configuration Format](#server-configuration-format)
+  - [Tips: Where to Put MCP Server Configs and a Working Example](#tips-where-to-put-mcp-server-configs-and-a-working-example)
 - [Compatible Models](#compatible-models)
+  - [Ollama Cloud Models](#ollama-cloud-models)
 - [Where Can I Find More MCP Servers?](#where-can-i-find-more-mcp-servers)
 - [Related Projects](#related-projects)
 - [License](#license)
@@ -70,6 +72,7 @@ MCP Client for Ollama (`ollmcp`) is a modern, interactive terminal application (
 
 - 🌐 **Multi-Server Support**: Connect to multiple MCP servers simultaneously
 - 🚀 **Multiple Transport Types**: Supports STDIO, SSE, and Streamable HTTP server connections
+- ☁️ **Ollama Cloud Support**: Works seamlessly with Ollama Cloud models for tool calling, enabling access to powerful cloud-hosted models while using local MCP tools
 - 🎨 **Rich Terminal Interface**: Interactive console UI with modern styling
 - 🌊 **Streaming Responses**: View model outputs in real-time as they're generated
 - 🛠️ **Tool Management**: Enable/disable specific tools or entire servers during chat sessions
@@ -147,8 +150,8 @@ ollmcp
 #### MCP Server Configuration:
 
 - `--mcp-server`, `-s`: Path to one or more MCP server scripts (.py or .js). Can be specified multiple times.
-- `--mcp-server-url`, `-u`: URL to one or more SSE or Streamable HTTP MCP servers. Can be specified multiple times.
-- `--servers-json`, `-j`: Path to a JSON file with server configurations.
+- `--mcp-server-url`, `-u`: URL to one or more SSE or Streamable HTTP MCP servers. Can be specified multiple times. See [Common MCP endpoint paths](#common-mcp-endpoint-paths) for typical endpoints.
+- `--servers-json`, `-j`: Path to a JSON file with server configurations. See [Server Configuration Format](#server-configuration-format) for details.
 - `--auto-discovery`, `-a`: Auto-discover servers from Claude's default config file (default behavior if no other options provided).
 
 > [!TIP]
@@ -632,6 +635,62 @@ The JSON configuration file supports STDIO, SSE, and Streamable HTTP server type
 > [!NOTE]
 > **MCP 1.10.1 Transport Support**: The client now supports the latest Streamable HTTP transport with improved performance and reliability. If you specify a URL without a type, the client will default to using Streamable HTTP transport.
 
+### Tips: where to put MCP server configs and a working example
+
+A common point of confusion is where to store MCP server configuration files and how the TUI's save/load feature is used. Here's a short, practical guide that has helped other users:
+
+- The TUI's `save-config` / `load-config` (or `sc` / `lc`) commands are intended to save *TUI preferences* like which tools you enabled, your selected model, thinking mode, and other client-side settings. They are not required to register MCP server connections with the client.
+- For MCP server JSON files (the `mcpServers` object shown above) we recommend keeping them outside the TUI config directory or in a clear subfolder, for example:
+
+```
+~/.config/ollmcp/mcp-servers/config.json
+```
+
+You can then point `ollmcp` at that file at startup with `-j` / `--servers-json`.
+
+> [!IMPORTANT]
+> When using HTTP-based MCP servers, use the `streamable_http` type (not just `http`). Also check the [Common MCP endpoint paths](#common-mcp-endpoint-paths) section below for typical endpoints.
+
+Here a minimal working example let's say this is your `~/.config/ollmcp/mcp-servers/config.json`:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "type": "streamable_http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer mytoken"
+      }
+    }
+  }
+}
+```
+
+> [!TIP]
+> When using GitHub MCP server, make sure to replace `"mytoken"` with your actual GitHub API token.
+
+With that file in place you can connect using:
+
+```
+ollmcp -j ~/.config/ollmcp/mcp-servers/config.json
+```
+
+Here you can find a GitHub issue related to this common pitfall: https://github.com/jonigl/mcp-client-for-ollama/issues/112#issuecomment-3446569030
+
+#### Demo
+
+A short demo (asciicast) that should help anyone reproduce the working setup quickly. This example uses an [MCP server example with streamable HTTP protocol](https://github.com/jonigl/mcp-server-with-streamable-http-example) usage:
+
+[![asciicast](https://asciinema.org/a/751387.svg)](https://asciinema.org/a/751387)
+
+#### Common MCP endpoint paths
+
+Streamable HTTP MCP servers typically expose the MCP endpoint at `/mcp` (e.g., `https://host/mcp`), while SSE servers commonly use `/sse` (e.g., `https://host/sse`). Below is an excerpt from the MCP specification (2025-06-18):
+> The server MUST provide a single HTTP endpoint path (hereafter referred to as the MCP endpoint) that supports both POST and GET methods. For example, this could be a URL like https://example.com/mcp.
+
+You can find more details in the [MCP specification version 2025-06-18 - Transports](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports).
+
 ## Compatible Models
 
 The following Ollama models work well with tool use:
@@ -643,6 +702,33 @@ The following Ollama models work well with tool use:
 - mistral
 
 For a complete list of Ollama models with tool use capabilities, visit the [official Ollama models page](https://ollama.com/search?c=tools).
+
+### Ollama Cloud Models
+
+MCP Client for Ollama now supports [Ollama Cloud models](https://github.com/ollama/ollama/blob/main/docs/cloud.md), allowing you to use powerful cloud-hosted models with tool calling capabilities while leveraging your local MCP tools. Cloud models can run without a powerful local GPU, making it possible to access larger models that wouldn't fit on a personal computer.
+
+**Supported Ollama Cloud models include for example:**
+- `gpt-oss:20b-cloud`
+- `gpt-oss:120b-cloud`
+- `deepseek-v3.1:671b-cloud`
+- `qwen3-coder:480b-cloud`
+
+**To use Ollama Cloud models with this client:**
+
+1. First, pull the cloud model:
+   ```bash
+   ollama pull gpt-oss:120b-cloud
+   ```
+
+2. Run the client with your chosen cloud model:
+   ```bash
+   ollmcp --model gpt-oss:120b-cloud
+   ```
+
+> [!NOTE]
+> The model `deepseek-v3.1:671b-cloud` only supports tool use when thinking mode is turned off. You can toggle thinking mode in `ollmcp` by typing either `thinking-mode` or `tm`.
+
+For more information about Ollama Cloud, visit the [Ollama Cloud documentation](https://docs.ollama.com/cloud).
 
 ### How Tool Calls Work
 
@@ -665,6 +751,7 @@ This repository contains reference implementations for the Model Context Protoco
 ## Related Projects
 
 - **[Ollama MCP Bridge](https://github.com/jonigl/ollama-mcp-bridge)** - A Python API layer that sits in front of Ollama, automatically adding tools from multiple MCP servers to every chat request. This project provides a transparent proxy solution that pre-loads all MCP servers at startup and seamlessly integrates their tools into the Ollama API.
+- **[MCP Server with Streamable HTTP Example](https://github.com/jonigl/mcp-server-with-streamable-http-example)** - An example MCP server demonstrating the usage of the streamable HTTP protocol.
 
 ## License
 

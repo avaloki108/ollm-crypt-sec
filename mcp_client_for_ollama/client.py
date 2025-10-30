@@ -282,6 +282,14 @@ class MCPClient:
             show_metrics=self.show_metrics
         )
 
+        # response_text will be either empty or contain a response
+        # Append the assistant's response to messages helps maintain context and fix ollama cloud tool call issues
+        messages.append({
+            "role": "assistant",
+            "content": response_text,
+            "tool_calls": tool_calls
+        })
+
         # Update actual token count from metrics if available
         if metrics and metrics.get('eval_count'):
             self.actual_token_count += metrics['eval_count']
@@ -312,7 +320,7 @@ class MCPClient:
                     messages.append({
                         "role": "tool",
                         "content": tool_response,
-                        "name": tool_name
+                        "tool_name": tool_name
                     })
                     continue
 
@@ -329,7 +337,7 @@ class MCPClient:
                 messages.append({
                     "role": "tool",
                     "content": tool_response,
-                    "name": tool_name
+                    "tool_name": tool_name
                 })
 
             # Get stream response from Ollama with the tool results
@@ -635,7 +643,7 @@ class MCPClient:
         if not self.thinking_mode:
             self.console.print(Panel(
                 f"[bold yellow]Thinking mode is currently disabled[/bold yellow]\n\n"
-                f"Enable thinking mode first using [bold cyan]thinking[/bold cyan] or [bold cyan]th[/bold cyan] command.\n"
+                f"Enable thinking mode first using [bold cyan]thinking-mode[/bold cyan] or [bold cyan]tm[/bold cyan] command.\n"
                 f"This setting only applies when thinking mode is active.",
                 title="Show Thinking Setting", border_style="yellow", expand=False
             ))
@@ -1229,6 +1237,11 @@ async def async_main(mcp_server, mcp_server_url, servers_json, auto_discovery, m
     try:
         await client.connect_to_servers(mcp_server, mcp_server_url, config_path, auto_discovery_final)
         client.auto_load_default_config()
+
+        # If model was explicitly provided via CLI flag (not default), override any loaded config
+        if model != DEFAULT_MODEL:
+            client.model_manager.set_model(model)
+
         await client.chat_loop()
     finally:
         await client.cleanup()
