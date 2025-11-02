@@ -1,0 +1,48 @@
+# Web3 Security Auditor Agent Configuration
+# This agent is specialized for smart contract security auditing
+# For deep logic-based analysis, use deep_security_auditor.yaml instead
+
+type: web3_audit
+name: web3-auditor
+model: qwen2.5:7b
+
+# System prompt (optional - uses default if not specified)
+# system_prompt: |
+#   Your custom system prompt here...
+
+# MCP Servers to connect to
+servers:
+  # Use the config file we created
+  config_file: ~/.config/ollmcp/mcp-servers/web3-audit.json
+
+# Tools to enable (optional - enables all by default)
+enabled_tools:
+  - mcp-filesystem.read_file
+  - mcp-filesystem.list_directory
+  - mcp-filesystem.write_file
+  - mcp-filesystem.edit_file
+  - mcp-filesystem.edit_file_at_line
+  - mcp-filesystem.search_files
+  - mcp-filesystem.read_multiple_files
+  - analyze-solidity.analyze_function_context
+  - bash-server.execute_command
+  - bash-server.check_tool_available
+  - bash-server.run_security_tool
+  - bash-server.web3_scanner_scan
+  - bash-server.start_web3se_services
+  - bash-server.check_web3se_status
+
+# Agent-specific configuration
+audit_config:
+  severity_levels:
+    - Critical
+    - High
+    - Medium
+    - Low
+    - Info
+  
+  tools_to_use:
+    - slither
+    - mythril
+    - foundry
+    - hardhat
