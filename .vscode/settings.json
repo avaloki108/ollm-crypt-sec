@@ -1,0 +1,5 @@
+{
+    "python.languageServer": "None",
+    "editor.tabCompletion": "on",
+    "diffEditor.codeLens": true
+}
