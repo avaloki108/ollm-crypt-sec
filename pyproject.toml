@@ -24,6 +24,7 @@ dependencies = [
 [project.scripts]
 mcp-client-for-ollama = "mcp_client_for_ollama.cli:run_cli"
 ollmcp = "mcp_client_for_ollama.cli:run_cli"
+ollm = "mcp_client_for_ollama.cli:run_cli"
 
 [build-system]
 requires = ["setuptools>=61.0"]
