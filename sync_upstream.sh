@@ -62,26 +62,32 @@ fi
 CURRENT_BRANCH=$(git branch --show-current)
 log_message "${BLUE}📍 Current branch: ${CURRENT_BRANCH}${NC}"
 
-# Check if we have any uncommitted changes
+# Check if we have any uncommitted changes (excluding the log file)
+git add "$LOG_FILE" 2>/dev/null || true  # Add log file to avoid conflicts
 if ! git diff-index --quiet HEAD --; then
-    log_message "${YELLOW}⚠️  Warning: You have uncommitted changes!${NC}"
-    echo ""
-    log_message "${YELLOW}Uncommitted files:${NC}"
-    git status --porcelain | head -10
-    if [[ $(git status --porcelain | wc -l) -gt 10 ]]; then
-        echo "... and $(($(git status --porcelain | wc -l) - 10)) more files"
-    fi
-    echo ""
-    read -p "Do you want to stash these changes temporarily? (y/N): " -n 1 -r
-    echo ""
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        STASH_MESSAGE="Auto-stash before upstream sync $(date '+%Y-%m-%d %H:%M:%S')"
-        git stash push -m "$STASH_MESSAGE"
-        log_message "${GREEN}✅ Changes stashed with message: $STASH_MESSAGE${NC}"
-        STASHED=true
-    else
-        log_message "${RED}❌ Please commit or stash your changes first, then run this script again${NC}"
-        exit 1
+    # Check if there are changes other than the log file
+    UNCOMMITTED_FILES=$(git status --porcelain | grep -v "sync_upstream.log" | wc -l)
+    if [[ "$UNCOMMITTED_FILES" -gt 0 ]]; then
+        log_message "${YELLOW}⚠️  Warning: You have uncommitted changes!${NC}"
+        echo ""
+        log_message "${YELLOW}Uncommitted files:${NC}"
+        git status --porcelain | grep -v "sync_upstream.log" | head -10
+        if [[ $(git status --porcelain | grep -v "sync_upstream.log" | wc -l) -gt 10 ]]; then
+            echo "... and $(($(git status --porcelain | grep -v "sync_upstream.log" | wc -l) - 10)) more files"
+        fi
+        echo ""
+        read -p "Do you want to stash these changes temporarily? (y/N): " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            STASH_MESSAGE="Auto-stash before upstream sync $(date '+%Y-%m-%d %H:%M:%S')"
+            # Stash everything except the log file
+            git stash push -m "$STASH_MESSAGE" -- $(git diff --name-only | grep -v "sync_upstream.log")
+            log_message "${GREEN}✅ Changes stashed with message: $STASH_MESSAGE${NC}"
+            STASHED=true
+        else
+            log_message "${RED}❌ Please commit or stash your changes first, then run this script again${NC}"
+            exit 1
+        fi
     fi
 fi
 
@@ -134,11 +140,18 @@ UPSTREAM_COMMITS=$(git rev-list HEAD.."$UPSTREAM_REMOTE"/main --count 2>/dev/nul
 if [[ "$UPSTREAM_COMMITS" -eq 0 ]]; then
     log_message "${GREEN}✅ You're already up to date with upstream!${NC}"
     
+    # Commit the log file if it has changes
+    git add "$LOG_FILE" 2>/dev/null || true
+    git commit -m "Update sync log" 2>/dev/null || true
+    
     # Restore stashed changes if any
     if [[ "$STASHED" == "true" ]]; then
         log_message "${BLUE}📦 Restoring your stashed changes...${NC}"
-        git stash pop
-        log_message "${GREEN}✅ Your changes have been restored${NC}"
+        if git stash pop; then
+            log_message "${GREEN}✅ Your changes have been restored${NC}"
+        else
+            log_message "${YELLOW}⚠️  Some conflicts while restoring. Please check manually.${NC}"
+        fi
     fi
     
     log_message "${CYAN}🎉 No action needed - everything is current!${NC}"
@@ -180,10 +193,14 @@ echo ""
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     log_message "${RED}❌ Sync cancelled by user${NC}"
     
+    # Commit the log file if it has changes
+    git add "$LOG_FILE" 2>/dev/null || true
+    git commit -m "Update sync log" 2>/dev/null || true
+    
     # Restore stashed changes if any
     if [[ "$STASHED" == "true" ]]; then
         log_message "${BLUE}📦 Restoring your stashed changes...${NC}"
-        git stash pop
+        git stash pop 2>/dev/null || log_message "${YELLOW}⚠️  Stash restore had some issues, but your changes are safe${NC}"
         log_message "${GREEN}✅ Your changes have been restored${NC}"
     fi
     
@@ -258,6 +275,10 @@ fi
 if [[ "$STASHED" == "true" ]]; then
     separator
     log_message "${BLUE}📦 Restoring your stashed changes...${NC}"
+    # Commit the log file first to avoid conflicts
+    git add "$LOG_FILE" 2>/dev/null || true
+    git commit -m "Update sync log" 2>/dev/null || true
+    
     if git stash pop; then
         log_message "${GREEN}✅ Your changes have been restored and merged${NC}"
     else
