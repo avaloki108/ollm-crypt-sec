@@ -12,6 +12,7 @@ from contextlib import AsyncExitStack
 
 from .base import SubAgent
 from .web3_audit import Web3AuditAgent
+from .chain_watcher import ChainWatcherAgent
 from .researcher import ResearcherAgent
 from .coder import CoderAgent
 from .writer import WriterAgent
@@ -126,6 +127,13 @@ class AgentManager:
                 agent = RAGAgent(
                     model=model or "qwen2.5:7b",
                     custom_prompt=config.get("system_prompt") if config else None,
+                    **common_params
+                )
+            elif agent_type == "chain_watcher":
+                agent = ChainWatcherAgent(
+                    model=model or "qwen2.5:7b",
+                    custom_prompt=config.get("system_prompt") if config else None,
+                    etherscan_api_key=config.get("etherscan_api_key") if config else None,
                     **common_params
                 )
             elif agent_type == "base":

@@ -1,0 +1,102 @@
+# Audit Configuration Options
+# Controls optional features for Web3 security audits
+
+# Visualization
+enable_visualisation: false  # Generate t-SNE plots of embeddings
+viz_output_dir: "audit_reports"  # Directory for visualization images
+
+# Parallel Execution
+parallel_static: true  # Run static analyzers in parallel
+max_workers: 4  # Maximum parallel workers for static analysis
+
+# Similarity Thresholds
+similarity_threshold: 0.85  # Minimum embedding similarity for matches
+intent_threshold_critical: 0.9  # Critical intent score threshold
+intent_threshold_high: 0.8  # High risk intent score threshold
+intent_threshold_medium: 0.7  # Medium risk intent score threshold
+
+# Confidence Scoring
+confidence_auto_approve: 0.9  # Auto-approve findings above this confidence
+confidence_auto_reject: 0.7  # Auto-reject findings below this (if similarity < 0.75)
+similarity_auto_reject: 0.75  # Minimum similarity to avoid auto-reject
+
+# Report Generation
+report_template: "audit_report.md.j2"  # Jinja2 template name
+report_output_dir: "audit_reports"  # Directory for generated reports
+include_visualizations: true  # Include viz in reports if generated
+
+# Vulnerability Database
+vuln_db_path: ~/.config/ollmcp/vuln_db.json  # Path to vulnerability embeddings DB
+smartbert_url: http://localhost:9900/embed  # SmartBERT API URL
+
+# Static Analysis Tools
+static_tools:
+  - slither
+  - mythril
+  - securify2
+  # - echidna  # Uncomment to enable
+
+# Tool Timeouts (seconds)
+tool_timeout_slither: 300
+tool_timeout_mythril: 600
+tool_timeout_securify2: 300
+
+# AI Service Configuration
+web3se_check_retries: 3  # Number of retries for service health check
+web3se_retry_delay: 5  # Delay between retries (seconds)
+web3se_fallback_static_only: true  # Continue with static-only if AI services unavailable
+
+# Audit Depth
+analysis_depth: deep  # Options: quick, standard, deep
+enable_business_logic_analysis: true  # Enable deep business logic analysis
+enable_economic_modeling: true  # Enable economic attack vector modeling
+enable_composability_analysis: true  # Enable cross-protocol analysis
+
+# Advanced Features
+
+# Policy-as-Code Audit Trails
+enable_audit_trail: true  # Enable tamper-proof audit logging
+audit_ledger_path: ~/.config/ollmcp/audit_ledger.json
+enable_model_snapshots: true  # Cache model snapshots for fallback
+model_cache_dir: ~/.config/ollmcp/model_cache
+
+# Resilience
+enable_circuit_breakers: true
+circuit_breaker_config:
+  smartbert:
+    failure_threshold: 5
+    timeout: 60
+  web3sekit:
+    failure_threshold: 3
+    timeout: 30
+
+enable_exponential_backoff: true
+backoff_config:
+  max_retries: 3
+  initial_delay: 1.0
+  max_delay: 60.0
+  jitter: true
+
+enable_idempotent_tasks: true  # Prevent duplicate work
+
+# Pub-Sub Broker
+enable_pubsub: true  # Enable event-driven agent communication
+
+# Chain Watcher
+enable_chain_watcher: false  # Monitor on-chain activity
+etherscan_api_key: ""  # Optional: Etherscan API key
+chain_watch_interval: 60  # Seconds between checks
+
+# UMAP Clustering
+enable_umap_clustering: true  # Enhanced embedding analysis
+umap_n_neighbors: 15
+umap_min_dist: 0.1
+umap_n_components: 2  # For visualization (2 or 3)
+
+# ML False Positive Filter
+enable_ml_filter: true  # Self-improving filter
+ml_filter_confidence_threshold: 0.7
+ml_filter_model_path: ~/.config/ollmcp/ml_filter.pkl
+ml_filter_training_data: ~/.config/ollmcp/training_data
+auto_train_ml_filter: true  # Auto-train when new data available
+

@@ -6,11 +6,44 @@ This guide describes the complete workflow for deep security auditing that goes 
 
 ## The Complete Workflow
 
-### Phase 1: Tool Execution and Initial Analysis
+### Phase 1: AI-Powered Analysis and Tool Execution
 
-**Objective**: Run automated tools and collect initial findings
+**Objective**: Use AI-powered tools first, then run static analyzers
 
 **Steps**:
+
+#### 1.1 AI-Powered Analysis (START HERE)
+1. **Check web3se-lab services status**:
+   ```
+   check_web3se_status
+   ```
+
+2. **Start services if needed**:
+   ```
+   start_web3se_services (with background=true)
+   ```
+
+3. **Run web3-scanner on repository**:
+   ```
+   web3_scanner_scan({
+     "repository_path": "/path/to/repo",
+     "with_intent": true,
+     "with_embed": true,
+     "output_file": "web3-scan-results.json"
+   })
+   ```
+   This generates:
+   - **SmartBERT embeddings** (768-dim vectors) for each contract
+   - **SmartIntentNN intent detection** scores (fee manipulation, honeypots, etc.)
+   - **Code tree structure** for each contract
+
+4. **Analyze AI findings**:
+   - Review contracts with high intent scores (>0.8 = high risk)
+   - Compare embeddings with known vulnerable patterns
+   - Identify contracts with malicious intent indicators
+   - Prioritize these for deep analysis
+
+#### 1.2 Static Analysis Tools
 1. Execute all available static analyzers:
    - Slither: `run_security_tool({"tool_name": "slither", "arguments": "."})`
    - Mythril: `run_security_tool({"tool_name": "mythril", "arguments": "analyze Contract.sol"})`
@@ -23,16 +56,29 @@ This guide describes the complete workflow for deep security auditing that goes 
 3. Run Foundry tests:
    - `execute_command({"command": "forge test -vvv"})`
 
-4. Run AI-powered analysis:
-   - web3-scanner for intent detection and embeddings
-
-**Output**: Raw findings from all tools
+**Output**: 
+- SmartBERT embeddings and intent detection scores
+- Raw findings from all static analysis tools
+- Prioritized list of high-risk contracts (from AI analysis)
 
 ### Phase 2: False Positive Filtering ⚠️ CRITICAL
 
 **Objective**: Filter out findings that cannot be exploited in practice
 
 **Process**:
+
+#### 2.1 Filter AI Findings
+For each SmartIntentNN intent detection:
+- **High score (>0.8)**: Investigate thoroughly - likely real issue
+- **Medium score (0.5-0.8)**: Review with business logic analysis
+- **Low score (<0.5)**: May be false positive, verify manually
+
+For each SmartBERT embedding match:
+- **Similar patterns**: Compare against known vulnerabilities
+- **Cross-reference**: Verify with static analysis tools
+- **Validate**: Use deep reasoning to confirm exploitability
+
+#### 2.2 Filter Tool Findings
 For each tool finding, ask:
 
 1. **Can this be exploited?**
@@ -189,39 +235,74 @@ Generate and test hypotheses for SwapProtocol.sol:
 
 ### Phase 5: Comprehensive Report Generation 📊
 
-**Objective**: Create a professional audit report with only validated findings
+**Objective**: Create a professional audit report with structured sections
 
 **Report Structure**:
 
 1. **Executive Summary**
    - Scope of review
-   - Summary of findings
+   - Total contracts analyzed
+   - AI-powered findings summary (intent scores, embedding matches)
+   - Static analyzer findings summary
+   - Validated risks count
    - Risk assessment
 
 2. **Methodology**
-   - Tools used
-   - Analysis approach
+   - Tools used (AI: SmartBERT, SmartIntentNN; Static: Slither, Mythril, etc.)
+   - Analysis approach (AI-first with static validation)
    - False positive filtering process
+   - Service availability (AI services running/fallback mode)
 
-3. **Findings** (Only validated vulnerabilities)
-   - Organized by severity
+3. **AI Flags Section** (NEW - Structured AI Results)
+   - **Intent Detection Results**:
+     - Contracts with high intent scores (>0.9 = critical, 0.8-0.9 = high risk)
+     - Intent types detected (fee, honeypot, mint, etc.) with scores
+     - Contracts prioritized by AI analysis
+   - **Embedding Analysis**:
+     - Cosine similarity scores (>0.85 = high match, 0.75-0.85 = medium)
+     - Pattern matches to known vulnerabilities (CVE references)
+     - Outlier contracts (unusual embedding patterns)
+   - **AI Confidence Scores**:
+     - High confidence (>0.9): Multiple AI signals align
+     - Medium confidence (0.7-0.9): Single strong signal
+     - Low confidence (<0.7): Weak signals, require validation
+
+4. **Static Corroboration Section** (NEW - Bidirectional Analysis)
+   - **AI → Static Validation**:
+     - Slither findings that match AI flags
+     - Mythril findings that match AI flags
+     - Securify2 findings that match AI flags
+   - **Static → AI Validation**:
+     - Static findings AI missed (re-run SmartIntentNN on these)
+     - Embedding analysis of static-flagged contracts
+     - Cross-validation results
+
+5. **Validated Risks Section** (Only Proven Vulnerabilities)
+   - Organized by severity (Critical → Info)
    - Each finding includes:
      - Title
      - Severity
+     - **AI Analysis**: Intent scores, embedding similarities, confidence
+     - **Static Analysis**: Confirming tool findings
      - Description
      - Attack Vector
      - Proof of Concept
      - Impact
      - Recommendation
 
-4. **Business Logic Analysis**
-   - Value flow analysis
+6. **False Positives Filtered**
+   - AI flags filtered out (with reasoning)
+   - Static findings filtered out (with reasoning)
+   - Confidence scores that led to auto-approval/rejection
+
+7. **Business Logic Analysis**
+   - Value flow analysis (on AI-flagged contracts)
    - Invariant violations
    - Economic attack vectors
    - Composability risks
 
-5. **Recommendations**
-   - Prioritized fixes
+8. **Recommendations**
+   - Prioritized fixes (based on AI scores + static confirmation)
    - Code examples
    - Best practices
 

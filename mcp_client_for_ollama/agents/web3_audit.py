@@ -1,11 +1,15 @@
 """Specialized agent for Web3 security auditing."""
 
+import json
+import pathlib
 from typing import Optional, List, Dict, Any
 from rich.console import Console
 import ollama
 from contextlib import AsyncExitStack
 
 from .base import SubAgent
+from .audit_engine import AuditEngine
+from .report_builder import ReportBuilder
 
 
 class Web3AuditAgent(SubAgent):
@@ -83,6 +87,15 @@ You have access to tools for:
         # Audit-specific settings
         self.audit_findings: List[Dict[str, Any]] = []
         self.contracts_analyzed: List[str] = []
+        
+        # Initialize audit engine and report builder
+        self.audit_engine = AuditEngine()
+        self.report_builder = ReportBuilder()
+        
+        # Audit configuration
+        self.enable_visualisation = False
+        self.parallel_static = True
+        self.similarity_threshold = 0.85
     
     async def analyze_contract(self, contract_path: str, analysis_type: str = "full") -> str:
         """Analyze a smart contract file.
@@ -151,28 +164,102 @@ Please:
         
         return await self.execute_task(task)
     
-    async def generate_audit_report(self) -> str:
-        """Generate a comprehensive audit report.
+    async def generate_audit_report(
+        self,
+        repository_path: str = "",
+        output_path: str = "audit_report.md",
+        include_viz: bool = None,
+        ai_flags: Optional[List[Dict[str, Any]]] = None,
+        static_validation: Optional[List[Dict[str, Any]]] = None,
+        business_logic: Optional[List[Dict[str, Any]]] = None
+    ) -> str:
+        """Generate a comprehensive audit report using Jinja2 template.
         
+        Args:
+            repository_path: Path to audited repository
+            output_path: Output file path for report
+            include_viz: Whether to include visualization (overrides config)
+            ai_flags: AI detection results (auto-extracted if None)
+            static_validation: Static analyzer validation results
+            business_logic: Business logic analysis results
+            
         Returns:
-            str: Formatted audit report
+            Path to generated report file
         """
-        task = f"""Generate a comprehensive audit report based on all analysis performed.
-
-Contracts analyzed: {', '.join(self.contracts_analyzed) if self.contracts_analyzed else 'None'}
-
-Please create a professional audit report including:
-1. Executive Summary
-2. Scope of Review
-3. Findings (categorized by severity)
-4. Detailed Vulnerability Descriptions
-5. Recommendations
-6. Conclusion
-
-Format the report in markdown.
-"""
+        # Finalize findings with confidence scores
+        finalized_findings = self.finalize_findings_with_confidence()
         
-        return await self.execute_task(task)
+        # Calculate statistics
+        summary = self.get_findings_summary()
+        stats = {
+            "total_contracts": len(self.contracts_analyzed),
+            "critical": summary.get("Critical", 0),
+            "high": summary.get("High", 0),
+            "medium": summary.get("Medium", 0),
+            "low": summary.get("Low", 0),
+            "info": summary.get("Info", 0),
+            "validated": len([f for f in finalized_findings if f.get("status") == "validated"]),
+            "rejected": len([f for f in finalized_findings if f.get("status") == "rejected"]),
+            "needs_review": len([f for f in finalized_findings if f.get("status") == "needs_review"])
+        }
+        
+        # Extract AI flags from findings if not provided
+        if ai_flags is None:
+            ai_flags = []
+            for finding in finalized_findings:
+                if "ai_intent_score" in finding or "max_embedding_similarity" in finding:
+                    ai_flags.append({
+                        "name": finding.get("title", "Unknown"),
+                        "path": finding.get("location", ""),
+                        "intent_scores": {"overall": finding.get("ai_intent_score", 0.0)},
+                        "max_similarity": finding.get("max_embedding_similarity", 0.0),
+                        "embedding_matches": finding.get("embedding_matches", []),
+                        "priority": finding.get("severity", "Unknown")
+                    })
+        
+        # Generate visualization if enabled
+        viz_path = None
+        if include_viz or (include_viz is None and self.enable_visualisation):
+            # Try to extract embeddings from findings
+            embeddings_dict = {}
+            for finding in finalized_findings:
+                if "embedding" in finding:
+                    name = finding.get("title", "Unknown")
+                    embeddings_dict[name] = finding["embedding"]
+            
+            if embeddings_dict:
+                viz_path = self.generate_visualization(embeddings_dict)
+        
+        # Generate recommendations from findings
+        recommendations = []
+        for finding in finalized_findings:
+            if finding.get("status") == "validated" or finding.get("severity") in ["Critical", "High"]:
+                recommendations.append({
+                    "title": finding.get("title", "Unknown"),
+                    "severity": finding.get("severity", "Unknown"),
+                    "location": finding.get("location", ""),
+                    "fix": finding.get("recommendation", ""),
+                    "priority": "high" if finding.get("severity") in ["Critical", "High"] else "medium"
+                })
+        
+        # Build report
+        report_content = self.report_builder.build_report(
+            findings=finalized_findings,
+            ai_flags=ai_flags,
+            stats=stats,
+            repository_path=repository_path or "/".join(self.contracts_analyzed[:1]) or "Unknown",
+            auditor_name=self.name,
+            viz_path=viz_path,
+            static_validation=static_validation,
+            business_logic=business_logic,
+            recommendations=recommendations
+        )
+        
+        # Save report
+        report_file = self.report_builder.save_report(report_content, output_path)
+        
+        self.console.print(f"[green]✓ Generated audit report: {report_file}[/green]")
+        return str(report_file)
     
     def add_finding(
         self,
@@ -220,3 +307,162 @@ Format the report in markdown.
                 summary[severity] += 1
         
         return summary
+    
+    def process_scan_results(
+        self,
+        scan_results_path: str,
+        similarity_threshold: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """Process web3-scanner results with embedding similarity matching.
+        
+        Args:
+            scan_results_path: Path to scan results JSON file
+            similarity_threshold: Override default threshold
+            
+        Returns:
+            Enhanced scan results with similarity matches
+        """
+        threshold = similarity_threshold or self.similarity_threshold
+        
+        try:
+            with open(scan_results_path, 'r') as f:
+                scan_results = json.load(f)
+            
+            processed = self.audit_engine.process_scan_results(
+                scan_results, threshold
+            )
+            
+            # Store processed results
+            processed_path = scan_results_path.replace('.json', '_processed.json')
+            with open(processed_path, 'w') as f:
+                json.dump(processed, f, indent=2)
+            
+            self.console.print(f"[green]✓ Processed scan results with embedding matches[/green]")
+            return processed
+            
+        except Exception as e:
+            self.console.print(f"[red]Error processing scan results: {e}[/red]")
+            return {}
+    
+    async def run_static_analysis_parallel(
+        self,
+        contract_paths: List[str],
+        tools: Optional[List[str]] = None,
+        max_workers: int = 4
+    ) -> Dict[str, Dict[str, Any]]:
+        """Run static analysis tools in parallel on multiple contracts.
+        
+        Args:
+            contract_paths: List of contract file paths
+            tools: List of tool names (default: all available)
+            max_workers: Maximum parallel workers
+            
+        Returns:
+            Dictionary mapping contract_path -> {tool_name -> result}
+        """
+        if not self.parallel_static:
+            # Sequential execution
+            results = {}
+            for path in contract_paths:
+                results[path] = {}
+                for tool_name in (tools or list(self.audit_engine.static_commands.keys())):
+                    results[path][tool_name] = self.audit_engine.run_static_tool(tool_name, path)
+            return results
+        
+        # Parallel execution
+        return self.audit_engine.run_static_parallel(contract_paths, tools, max_workers)
+    
+    def finalize_findings_with_confidence(self) -> List[Dict[str, Any]]:
+        """Apply confidence scoring and auto-approve/reject logic.
+        
+        Returns:
+            Finalized findings with confidence scores and status
+        """
+        finalized = self.audit_engine.finalize_findings(self.audit_findings)
+        self.audit_findings = finalized
+        return finalized
+    
+    def generate_visualization(
+        self,
+        embeddings_dict: Dict[str, Any],
+        output_path: str = "embedding_tsne.png"
+    ) -> Optional[str]:
+        """Generate t-SNE visualization of contract embeddings.
+        
+        Args:
+            embeddings_dict: Dictionary mapping contract names to embeddings
+            output_path: Output file path
+            
+        Returns:
+            Path to generated image, or None if unavailable
+        """
+        if not self.enable_visualisation:
+            return None
+        
+        return self.audit_engine.generate_tsne_plot(embeddings_dict, output_path)
+    
+    async def run_comprehensive_audit(
+        self,
+        repository_path: str,
+        config: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Run comprehensive audit workflow with AI-first approach.
+        
+        Args:
+            repository_path: Path to repository to audit
+            config: Optional configuration overrides
+            
+        Returns:
+            Complete audit results
+        """
+        if config:
+            self.enable_visualisation = config.get("enable_visualisation", False)
+            self.parallel_static = config.get("parallel_static", True)
+            self.similarity_threshold = config.get("similarity_threshold", 0.85)
+        
+        task = f"""Perform a comprehensive security audit of the repository at {repository_path}.
+
+Follow the AI-first workflow:
+
+1. **AI-Powered Analysis Phase**:
+   - Check web3se-lab services status using check_web3se_status
+   - Start services if needed using start_web3se_services
+   - Run web3_scanner_scan on the repository with intent detection and embeddings enabled
+   - Process scan results to find embedding similarity matches
+   - Prioritize contracts by intent scores (Critical >0.9, High 0.8-0.9, Medium 0.7-0.8)
+
+2. **Static Analysis Phase** (on AI-flagged contracts):
+   - Run Slither, Mythril, and Securify2 in parallel on high-priority contracts
+   - For each static finding, re-run SmartIntentNN to validate (bidirectional cross-ref)
+
+3. **False Positive Filtering**:
+   - Calculate confidence scores for all findings
+   - Auto-approve findings with confidence >0.9
+   - Auto-reject findings with confidence <0.7 and similarity <0.75
+   - Flag others for manual review
+
+4. **Deep Business Logic Analysis**:
+   - Analyze value flows in high-priority contracts
+   - Identify invariants and test violations
+   - Model economic attack vectors
+   - Analyze composability risks
+
+5. **Report Generation**:
+   - Generate comprehensive markdown report with all sections
+   - Include confidence scores and auto-approval status
+   - Add visualization if embeddings are available
+
+Use the audit_engine helper functions:
+- process_scan_results() for embedding matches
+- run_static_analysis_parallel() for parallel tool execution
+- finalize_findings_with_confidence() for confidence scoring
+- generate_visualization() if enabled
+"""
+        
+        result = await self.execute_task(task)
+        return {
+            "audit_result": result,
+            "findings": self.audit_findings,
+            "summary": self.get_findings_summary(),
+            "contracts_analyzed": self.contracts_analyzed
+        }

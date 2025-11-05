@@ -1,0 +1,305 @@
+# {{ title }} - Security Audit Report
+
+**Generated:** {{ timestamp }}  
+**Repository:** {{ repository_path }}  
+**Auditor:** {{ auditor_name }}
+
+---
+
+## Executive Summary
+
+### Overview
+This report presents the findings from a comprehensive security audit of the smart contract codebase. The audit employed an **AI-first approach** using SmartBERT embeddings and SmartIntentNN intent detection, followed by static analysis tools and deep business logic analysis.
+
+### Key Statistics
+
+| Metric | Count |
+|--------|-------|
+| **Total Contracts Analyzed** | {{ stats.total_contracts }} |
+| **Critical Findings** | {{ stats.critical }} |
+| **High Risk Findings** | {{ stats.high }} |
+| **Medium Risk Findings** | {{ stats.medium }} |
+| **Low Risk Findings** | {{ stats.low }} |
+| **Info Findings** | {{ stats.info }} |
+| **Validated Risks** | {{ stats.validated }} |
+| **Auto-Rejected** | {{ stats.rejected }} |
+| **Needs Review** | {{ stats.needs_review }} |
+
+### Risk Assessment
+{% if stats.critical > 0 %}
+⚠️ **CRITICAL**: {{ stats.critical }} critical finding(s) detected. Immediate attention required.
+{% endif %}
+{% if stats.high > 0 %}
+🔴 **HIGH RISK**: {{ stats.high }} high-risk finding(s) identified.
+{% endif %}
+{% if stats.critical == 0 and stats.high == 0 %}
+✅ **LOW RISK**: No critical or high-risk findings detected.
+{% endif %}
+
+---
+
+## AI Flags Section
+
+### Intent Detection Results
+
+{% for contract in ai_flags %}
+### {{ contract.name }}
+
+**Path:** `{{ contract.path }}`
+
+**Intent Scores:**
+{% for intent_type, score in contract.intent_scores.items() %}
+- **{{ intent_type }}**: {{ "%.3f"|format(score) }}
+  {% if score > 0.9 %}
+    🔴 **CRITICAL** - Immediate investigation required
+  {% elif score > 0.8 %}
+    🟠 **HIGH RISK** - Investigate immediately
+  {% elif score > 0.7 %}
+    🟡 **MEDIUM RISK** - Review with static analyzers
+  {% elif score > 0.5 %}
+    🟢 **LOW RISK** - Optional review
+  {% else %}
+    ⚪ **VERY LOW** - Likely false positive
+  {% endif %}
+{% endfor %}
+
+**Max Embedding Similarity:** {{ "%.3f"|format(contract.max_similarity) if contract.max_similarity else "N/A" }}
+
+{% if contract.embedding_matches %}
+**Vulnerability Matches:**
+{% for match in contract.embedding_matches %}
+- **{{ match.vulnerability }}**: {{ "%.3f"|format(match.similarity) }} similarity
+  {% if match.similarity > 0.85 %}
+    (Strong match - investigate immediately)
+  {% elif match.similarity > 0.75 %}
+    (Moderate match - review with static analyzers)
+  {% else %}
+    (Weak match - may be false positive)
+  {% endif %}
+{% endfor %}
+{% endif %}
+
+**Priority:** {{ contract.priority }}
+
+---
+{% endfor %}
+
+### AI Confidence Analysis
+
+- **High Confidence (>0.9)**: {{ ai_stats.high_confidence }} findings
+- **Medium Confidence (0.7-0.9)**: {{ ai_stats.medium_confidence }} findings
+- **Low Confidence (<0.7)**: {{ ai_stats.low_confidence }} findings
+
+---
+
+## Static Corroboration Section
+
+### AI → Static Validation
+
+{% if static_ai_validation %}
+{% for validation in static_ai_validation %}
+#### {{ validation.contract_name }}
+
+**AI Flag**: {{ validation.ai_flag }}  
+**Static Tool**: {{ validation.tool }}  
+**Result**: {% if validation.confirmed %}✅ **CONFIRMED**{% else %}❌ **NOT CONFIRMED**{% endif %}
+
+{{ validation.description }}
+{% endfor %}
+{% else %}
+No AI-flagged contracts were validated by static analyzers.
+{% endif %}
+
+### Static → AI Validation
+
+{% if static_findings %}
+{% for finding in static_findings %}
+#### {{ finding.tool }} Finding
+
+**Location**: {{ finding.location }}  
+**Severity**: {{ finding.severity }}  
+**AI Re-analysis**: {% if finding.ai_recheck %}✅ Re-checked with SmartIntentNN{% else %}⏭️ Skipped{% endif %}
+
+{% if finding.ai_recheck %}
+- **Intent Score**: {{ finding.ai_intent_score }}
+- **Embedding Similarity**: {{ finding.embedding_similarity }}
+- **Status**: {% if finding.ai_confirmed %}✅ AI Confirmed{% else %}❌ AI Did Not Confirm{% endif %}
+{% endif %}
+
+{{ finding.description }}
+{% endfor %}
+{% else %}
+No static analyzer findings requiring AI validation.
+{% endif %}
+
+---
+
+## Validated Risks Section
+
+{% for finding in findings|selectattr("status", "equalto", "validated") %}
+
+### {{ finding.title }} - {{ finding.severity }}
+
+**Confidence Score**: {{ "%.3f"|format(finding.confidence) }}  
+**Status**: ✅ **VALIDATED** (Auto-approved)
+
+**AI Analysis:**
+- **Intent Score**: {{ "%.3f"|format(finding.ai_intent_score) }}
+- **Max Embedding Similarity**: {{ "%.3f"|format(finding.max_embedding_similarity) }}
+- **Vulnerability Matches**: {% if finding.embedding_matches %}{{ finding.embedding_matches|join(", ") }}{% else %}None{% endif %}
+
+**Static Analysis:**
+{% if finding.static_confirmed %}
+- ✅ Confirmed by static analyzers
+- **Tools**: {{ finding.static_tools|join(", ") }}
+{% else %}
+- ❌ Not confirmed by static analyzers
+{% endif %}
+
+**Location**: `{{ finding.location }}`
+
+**Description:**
+{{ finding.description }}
+
+**Attack Vector:**
+{{ finding.attack_vector }}
+
+**Impact:**
+{{ finding.impact }}
+
+**Recommendation:**
+{{ finding.recommendation }}
+
+{% if finding.proof_of_concept %}
+**Proof of Concept:**
+```solidity
+{{ finding.proof_of_concept }}
+```
+{% endif %}
+
+---
+{% endfor %}
+
+{% if (findings|selectattr("status", "equalto", "validated")|list)|length == 0 %}
+No validated risks found. All findings were filtered out or require manual review.
+{% endif %}
+
+---
+
+## Findings Requiring Review
+
+{% for finding in findings|selectattr("status", "equalto", "needs_review") %}
+
+### {{ finding.title }} - {{ finding.severity }}
+
+**Confidence Score**: {{ "%.3f"|format(finding.confidence) }}  
+**Status**: ⚠️ **NEEDS MANUAL REVIEW**
+
+**AI Analysis:**
+- **Intent Score**: {{ "%.3f"|format(finding.ai_intent_score) }}
+- **Max Embedding Similarity**: {{ "%.3f"|format(finding.max_embedding_similarity) }}
+
+**Static Analysis:**
+{% if finding.static_confirmed %}
+- ✅ Confirmed by static analyzers
+{% else %}
+- ❌ Not confirmed by static analyzers
+{% endif %}
+
+**Location**: `{{ finding.location }}`
+
+**Description:**
+{{ finding.description }}
+
+**Reason for Review:**
+{{ finding.review_reason }}
+
+---
+{% endfor %}
+
+---
+
+## False Positives Filtered
+
+### Auto-Rejected Findings
+
+{% for finding in findings|selectattr("status", "equalto", "rejected") %}
+
+#### {{ finding.title }}
+
+**Confidence**: {{ "%.3f"|format(finding.confidence) }}  
+**AI Intent Score**: {{ "%.3f"|format(finding.ai_intent_score) }}  
+**Max Similarity**: {{ "%.3f"|format(finding.max_embedding_similarity) }}
+
+**Reason for Rejection:**
+{{ finding.rejection_reason }}
+
+---
+{% endfor %}
+
+---
+
+## Business Logic Analysis
+
+{% if business_logic %}
+{% for analysis in business_logic %}
+
+### {{ analysis.contract_name }}
+
+**Analysis Type**: {{ analysis.type }}
+
+{{ analysis.content }}
+
+---
+{% endfor %}
+{% else %}
+No deep business logic analysis performed (or no significant findings).
+{% endif %}
+
+---
+
+## Recommendations
+
+### Priority Fixes
+
+{% for rec in recommendations|selectattr("priority", "equalto", "high") %}
+1. **{{ rec.title }}**
+   - Severity: {{ rec.severity }}
+   - Location: `{{ rec.location }}`
+   - Fix: {{ rec.fix }}
+{% endfor %}
+
+### Additional Improvements
+
+{% for rec in recommendations|selectattr("priority", "ne", "high") %}
+- **{{ rec.title }}** ({{ rec.severity }}): {{ rec.fix }}
+{% endfor %}
+
+---
+
+## Conclusion
+
+This audit identified **{{ stats.validated }} validated risk(s)** requiring immediate attention, with an additional **{{ stats.needs_review }} finding(s)** requiring manual review.
+
+{% if stats.critical > 0 %}
+⚠️ **Action Required**: Critical findings detected. Please address these issues before deployment.
+{% endif %}
+
+All findings have been classified with confidence scores and cross-referenced between AI-powered analysis and traditional static analysis tools.
+
+---
+
+{% if viz_path %}
+## Embedding Visualization
+
+![Embedding Space]({{ viz_path }})
+
+This visualization shows the distribution of contract embeddings in 2D space (t-SNE). Contracts clustering together may share similar vulnerability patterns.
+{% endif %}
+
+---
+
+**Report Generated**: {{ timestamp }}  
+**Audit Engine Version**: {{ engine_version }}  
+**Confidence Thresholds**: Auto-approve >0.9, Auto-reject <0.7
+

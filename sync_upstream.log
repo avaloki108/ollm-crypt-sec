@@ -1,0 +1,5 @@
+[2025-11-04 21:37:28] \033[0;32m✅ Confirmed: Running in OLLM-CRYPT-SEC repository\033[0m
+[2025-11-04 21:37:28] \033[0;34m📍 Current branch: main\033[0m
+[2025-11-04 21:37:28] \033[1;33m⚠️  Warning: You have uncommitted changes!\033[0m
+[2025-11-04 21:37:28] \033[1;33mUncommitted files:\033[0m
+[2025-11-04 21:37:28] \033[0;31m❌ Please commit or stash your changes first, then run this script again\033[0m
