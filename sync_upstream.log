@@ -3,3 +3,13 @@
 [2025-11-04 21:37:28] \033[1;33m⚠️  Warning: You have uncommitted changes!\033[0m
 [2025-11-04 21:37:28] \033[1;33mUncommitted files:\033[0m
 [2025-11-04 21:37:28] \033[0;31m❌ Please commit or stash your changes first, then run this script again\033[0m
+[2025-11-04 21:40:35] \033[0;32m✅ Changes stashed with message: Auto-stash before upstream sync 2025-11-04 21:40:35\033[0m
+[2025-11-04 21:40:35] \033[0;34m🔍 Checking upstream remote configuration...\033[0m
+[2025-11-04 21:40:35] \033[0;32m✅ Upstream remote correctly configured\033[0m
+[2025-11-04 21:40:35] \033[0;34m🔒 Ensuring upstream is fetch-only (safety measure)...\033[0m
+[2025-11-04 21:40:35] \033[0;32m✅ Upstream remote set to fetch-only (cannot accidentally push)\033[0m
+[2025-11-04 21:40:35] \033[0;34m📡 Fetching latest changes from upstream...\033[0m
+[2025-11-04 21:40:36] \033[0;32m✅ Successfully fetched from upstream\033[0m
+[2025-11-04 21:40:36] \033[0;34m📊 Checking for available updates...\033[0m
+[2025-11-04 21:40:36] \033[0;32m✅ You're already up to date with upstream!\033[0m
+[2025-11-04 21:40:36] \033[0;34m📦 Restoring your stashed changes...\033[0m
