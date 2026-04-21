@@ -39,3 +39,29 @@
 [2025-11-04 21:45:18] \033[0;32m✅ Successfully fetched from upstream\033[0m
 [2025-11-04 21:45:18] \033[0;34m📊 Checking for available updates...\033[0m
 [2025-11-04 21:45:18] \033[0;32m✅ You're already up to date with upstream!\033[0m
+[2025-11-11 23:42:43] \033[0;32m✅ Changes stashed with message: Auto-stash before upstream sync 2025-11-11 23:42:43\033[0m
+[2025-11-11 23:42:43] \033[0;34m🔍 Checking upstream remote configuration...\033[0m
+[2025-11-11 23:42:43] \033[0;32m✅ Upstream remote correctly configured\033[0m
+[2025-11-11 23:42:43] \033[0;34m🔒 Ensuring upstream is fetch-only (safety measure)...\033[0m
+[2025-11-11 23:42:43] \033[0;32m✅ Upstream remote set to fetch-only (cannot accidentally push)\033[0m
+[2025-11-11 23:42:43] \033[0;34m📡 Fetching latest changes from upstream...\033[0m
+[2025-11-11 23:42:43] \033[0;32m✅ Successfully fetched from upstream\033[0m
+[2025-11-11 23:42:43] \033[0;34m📊 Checking for available updates...\033[0m
+[2025-11-11 23:42:43] \033[0;35m📦 Found 3 new commits from upstream\033[0m
+[2025-11-11 23:42:43] \033[0;34m🔍 Here are the new commits from upstream:\033[0m
+[2025-11-11 23:42:43] \033[0;34m📋 Summary of files that will be changed:\033[0m
+[2025-11-11 23:42:46] \033[0;34m💾 Creating backup branch: backup-before-sync-20251111-234246\033[0m
+[2025-11-11 23:42:46] \033[0;32m✅ Backup created: backup-before-sync-20251111-234246\033[0m
+[2025-11-11 23:42:46] \033[0;34m📝 Pre-merge commit: 3c7e269c16acc83fdaae76a099d4c4724a20842d\033[0m
+[2025-11-11 23:42:46] \033[0;34m🔄 Merging upstream changes...\033[0m
+[2025-11-11 23:42:46] \033[0;31m⚠️  Merge conflicts detected!\033[0m
+[2025-11-11 23:42:46] \033[1;33m🛠️  To resolve conflicts:\033[0m
+[2025-11-11 23:42:46]    1. Edit the conflicted files shown above
+[2025-11-11 23:42:46]    2. Remove conflict markers (<<<<<<< ======= >>>>>>>)
+[2025-11-11 23:42:46]    3. Run: git add .
+[2025-11-11 23:42:46]    4. Run: git commit
+[2025-11-11 23:42:46] \033[0;34m💾 Your original state is backed up in: backup-before-sync-20251111-234246\033[0m
+[2025-11-11 23:42:46] \033[1;33m🔧 If you want to abort and restore original state:\033[0m
+[2025-11-11 23:42:46]    git merge --abort
+[2025-11-11 23:42:46]    git checkout backup-before-sync-20251111-234246
+
