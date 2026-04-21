@@ -106,6 +106,8 @@ class SubAgent:
         Returns:
             bool: True if at least one server connected successfully
         """
+        from ..tools.builtin import get_builtin_tool_objects
+
         sessions, available_tools, enabled_tools = await self.server_connector.connect_to_servers(
             server_paths=server_paths,
             server_urls=server_urls,
@@ -114,8 +116,15 @@ class SubAgent:
         )
         
         self.sessions = sessions
-        self.tool_manager.set_available_tools(available_tools)
-        self.tool_manager.set_enabled_tools(enabled_tools)
+
+        # Merge built-in tools (always available, same as MCPClient._setup_tools)
+        builtin_tools = get_builtin_tool_objects()
+        all_tools = builtin_tools + available_tools
+        all_enabled = {bt.name: True for bt in builtin_tools}
+        all_enabled.update(enabled_tools)
+
+        self.tool_manager.set_available_tools(all_tools)
+        self.tool_manager.set_enabled_tools(all_enabled)
         
         return len(sessions) > 0
     
@@ -137,101 +146,131 @@ class SubAgent:
         for tool_name in tool_names:
             self.tool_manager.set_tool_status(tool_name, False)
     
-    async def execute_task(self, task: str) -> str:
-        """Execute a task using this agent.
-        
+    async def execute_task(self, task: str, max_tool_rounds: int = 25) -> str:
+        """Execute a task using this agent with an agentic tool loop.
+
         Args:
             task: The task description/query to execute
-            
+            max_tool_rounds: Maximum number of tool-call rounds
+
         Returns:
             str: The agent's response
         """
-        # Create message with task
-        messages = [{
-            "role": "user",
-            "content": task
-        }]
-        
-        # Add system prompt
+        from ..tools.builtin import execute_builtin_tool
+        from ..utils.context import trim_messages_for_context
+
+        messages = [{"role": "user", "content": task}]
+
         system_prompt = self.model_config_manager.get_system_prompt()
         if system_prompt:
-            messages.insert(0, {
-                "role": "system",
-                "content": system_prompt
-            })
-        
-        # Get enabled tools
+            messages.insert(0, {"role": "system", "content": system_prompt})
+
+        # Context trimming before first call
+        num_ctx = self.model_config_manager.get_ollama_options().get("num_ctx", 8192)
+        messages, _ = trim_messages_for_context(messages, max_tokens=num_ctx)
+
         enabled_tool_objects = self.tool_manager.get_enabled_tool_objects()
-        available_tools = [{
-            "type": "function",
-            "function": {
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": tool.inputSchema
+        available_tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.inputSchema,
+                }
             }
-        } for tool in enabled_tool_objects]
-        
-        # Get current model
+            for tool in enabled_tool_objects
+        ]
+
         model = self.model_manager.get_current_model()
-        
-        # Get model options
         model_options = self.model_config_manager.get_ollama_options()
-        
-        # Execute query
+
+        # Initial call
         chat_params = {
             "model": model,
             "messages": messages,
             "stream": False,
             "tools": available_tools,
-            "options": model_options
+            "options": model_options,
         }
-        
         response = await self.ollama.chat(**chat_params)
-        
-        # Handle tool calls if present
-        if response.get('message', {}).get('tool_calls'):
-            tool_calls = response['message']['tool_calls']
-            
+        response_text = response.get('message', {}).get('content', '')
+        tool_calls = response.get('message', {}).get('tool_calls') or []
+
+        messages.append({
+            "role": "assistant",
+            "content": response_text,
+            "tool_calls": tool_calls,
+        })
+
+        # Agentic tool loop
+        for _round in range(max_tool_rounds):
+            if not tool_calls:
+                break
+
             for tool_call in tool_calls:
                 tool_name = tool_call['function']['name']
                 tool_args = tool_call['function']['arguments']
-                
-                # Parse server name and actual tool name
-                server_name, actual_tool_name = tool_name.split('.', 1) if '.' in tool_name else (None, tool_name)
-                
-                if not server_name or server_name not in self.sessions:
-                    self.console.print(f"[red]Agent {self.name}: Unknown server for tool {tool_name}[/red]")
+
+                if '.' in tool_name:
+                    server_name, actual_tool_name = tool_name.split('.', 1)
+                else:
+                    self.console.print(
+                        f"[red]Agent {self.name}: Unqualified tool name: {tool_name}[/red]"
+                    )
+                    messages.append({
+                        "role": "tool",
+                        "content": f"Error: tool name '{tool_name}' must be qualified as server.tool_name",
+                        "tool_name": tool_name,
+                    })
                     continue
-                
-                # Call the tool
-                result = await self.sessions[server_name]["session"].call_tool(actual_tool_name, tool_args)
-                tool_response = f"{result.content[0].text}"
-                
-                # Add tool response to messages
+
+                if server_name == "builtin":
+                    tool_response = await execute_builtin_tool(actual_tool_name, tool_args)
+                else:
+                    if server_name not in self.sessions:
+                        self.console.print(
+                            f"[red]Agent {self.name}: Unknown server '{server_name}'[/red]"
+                        )
+                        messages.append({
+                            "role": "tool",
+                            "content": f"Error: unknown server '{server_name}' for tool '{tool_name}'",
+                            "tool_name": tool_name,
+                        })
+                        continue
+                    result = await self.sessions[server_name]["session"].call_tool(
+                        actual_tool_name, tool_args
+                    )
+                    tool_response = result.content[0].text if result.content else ""
+
                 messages.append({
                     "role": "tool",
                     "content": tool_response,
-                    "name": tool_name
+                    "tool_name": tool_name,
                 })
-            
-            # Get final response with tool results
-            chat_params_followup = {
+
+            # Follow-up call WITH tools (so agent can chain more calls)
+            followup_params = {
                 "model": model,
                 "messages": messages,
                 "stream": False,
-                "options": model_options
+                "tools": available_tools,
+                "options": model_options,
             }
-            
-            response = await self.ollama.chat(**chat_params_followup)
-        
-        response_text = response.get('message', {}).get('content', '')
-        
-        # Store in history
-        self.chat_history.append({
-            "query": task,
-            "response": response_text
-        })
-        
+            response = await self.ollama.chat(**followup_params)
+            response_text = response.get('message', {}).get('content', '')
+            tool_calls = response.get('message', {}).get('tool_calls') or []
+
+            messages.append({
+                "role": "assistant",
+                "content": response_text,
+                "tool_calls": tool_calls,
+            })
+
+            if not tool_calls:
+                break
+
+        self.chat_history.append({"query": task, "response": response_text})
         return response_text
     
     async def cleanup(self) -> None:

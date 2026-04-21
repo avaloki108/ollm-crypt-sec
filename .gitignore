@@ -12,3 +12,6 @@ wheels/
 CRUSH.md
 
 cli-package/uv.lock
+
+# OpenMemory - IDE/Assistant specific rules
+.cursor/rules/openmemory.mdc

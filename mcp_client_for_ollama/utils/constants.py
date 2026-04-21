@@ -27,29 +27,47 @@ MCP_PROTOCOL_VERSION = "2025-06-18"
 
 # Interactive commands and their descriptions for autocomplete
 INTERACTIVE_COMMANDS = {
-    'tools': 'Configure available tools',
-    'help': 'Show help information',
+    # Model
     'model': 'Select Ollama model',
-    'model-config': 'Configure model parameters',
-    'context': 'Toggle context retention',
+    'model-config': 'Configure system prompt and model parameters',
     'thinking-mode': 'Toggle thinking mode',
-    'show-thinking': 'Toggle thinking visibility',
-    'show-tool-execution': 'Toggle tool execution display',
+    'show-thinking': 'Toggle thinking text visibility',
     'show-metrics': 'Toggle performance metrics display',
+    # Tools / servers
+    'tools': 'Configure available tools',
+    'show-tool-execution': 'Toggle tool execution display',
+    'human-in-the-loop': 'Toggle HIL confirmations',
+    'reload-servers': 'Reload MCP servers',
+    # Context
+    'context': 'Toggle context retention',
     'clear': 'Clear conversation context',
     'context-info': 'Show context information',
-    'clear-screen': 'Clear terminal screen',
+    # Sessions
+    'sessions': 'List saved conversation sessions',
+    'save-session': 'Save current conversation to disk',
+    'load-session': 'Load a saved conversation',
+    'delete-session': 'Delete a saved conversation',
+    # Configuration
     'save-config': 'Save current configuration',
     'load-config': 'Load saved configuration',
-    'reset-config': 'Reset to default config',
-    'reload-servers': 'Reload MCP servers',
-    'human-in-the-loop': 'Toggle HIL confirmations',
+    'reset-config': 'Reset configuration to defaults',
+    # Project
+    'init': 'Create .ollmcp.yaml project config in CWD',
+    'git': 'Show git status for CWD',
+    # Agents
     'agent': 'Manage specialized agents',
     'list-agents': 'List all agents',
+    # UI
+    'compact': 'Toggle compact output mode (hides tool display, thinking, and metrics)',
+    'clear-screen': 'Clear terminal screen',
+    'help': 'Show help information',
     'quit': 'Exit the application',
     'exit': 'Exit the application',
-    'bye': 'Exit the application'
+    'bye': 'Exit the application',
 }
+
+# Slash-command aliases (maps /cmd -> bare command name)
+SLASH_ALIASES: dict = {f"/{k}": k for k in INTERACTIVE_COMMANDS}
 
 # Default completion menu style (used by prompt_toolkit in interactive mode)
 DEFAULT_COMPLETION_STYLE = {

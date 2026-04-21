@@ -80,16 +80,15 @@ class StreamingManager:
                         status.stop()
                         first_chunk = False
 
-                    # Print separator and Answer label when transitioning from thinking to content
-                    if not accumulated_text:
+                    # Print separator when transitioning from thinking to content
+                    if not accumulated_text and thinking_content and show_thinking:
                         self.console.print()
-                        self.console.print(Markdown("📝 **Answer:**"))
                         self.console.print(Markdown("---"))
+                        self.console.print()
+                    elif not accumulated_text:
                         self.console.print()
 
                     accumulated_text += chunk.message.content
-
-                    # Print only new content as plain text (will render full markdown at end)
                     self.console.print(chunk.message.content, end="")
 
                 # Handle tool calls
@@ -103,18 +102,8 @@ class StreamingManager:
                     for tool in chunk.message.tool_calls:
                         tool_calls.append(tool)
 
-            # Print newline at end
+            # End streaming line
             self.console.print()
-
-            # Render final markdown content properly
-            if accumulated_text:
-                # Render in markdown format and state this
-                self.console.print()
-                self.console.print(Markdown("📝 **Answer (Markdown):**"))
-                self.console.print(Markdown("---"))
-                self.console.print()
-                self.console.print(Markdown(accumulated_text))
-                self.console.print()
 
         else:
             # Silent processing without display

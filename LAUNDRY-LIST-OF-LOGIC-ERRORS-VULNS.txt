@@ -1,0 +1,131 @@
+Laundry List of Web3 Vulnerabilities Requiring Deep Logic and Critical Thinking
+Web3 vulnerabilities that evade pattern-matching or static analysis tools (like Slither, Mythril, or even most dynamic fuzzers) are those that demand a developer's deep understanding of protocol economics, cross-contract interactions, EVM semantics, or multi-transaction sequencing. These aren't simple code smells (e.g., reentrancy or overflow) but complex business logic flaws where tools fail because they can't model incentives, real-world composability, or adversarial environments. Based on real-world exploits (e.g., Mango Markets oracle manip, Ronin bridge composability hacks) and audit trends, here's a comprehensive laundry list. I've grouped them loosely for clarity, with brief explanations of why they're missed and real-world examples where applicable. These are prime for bug bounties on platforms like Immunefi or Code4rena, as they often require manual simulation or economic modeling to spot.
+Oracle and Pricing Logic Flaws
+
+Flash Loan-Driven Oracle Price Manipulation: Tools see getPrice() calls but can't simulate economic incentives for single-tx skews via liquidity pools. Requires modeling swap impacts and collateral ratios.
+
+Example: Mango Markets $100M exploit (2022) via temporary price pumps.
+
+
+TWAP Oracle Window Attacks: Static tools miss short-window vulnerabilities where attackers time blocks to skew averages. Needs validator/MEV awareness.
+
+Example: Inverse Finance $15M drain (2022) by exploiting TWAP delays.
+
+
+Oracle Twisting in Liquidation Thresholds: Fuzzers don't model cross-market dependencies where one oracle influences another's liquidation logic, leading to undercollateralized loans.
+
+Example: Cream Finance $130M hack (2021) via Chainlink feed manipulation.
+
+
+
+Governance and Voting Exploits
+
+Governance Vote Manipulation via Flash Borrowing: No tool simulates transient token balances from loans to swing votes. Requires DAO semantics and bribe economics.
+
+Example: Beanstalk Farms $182M governance attack (2022).
+
+
+Delegate Timing Attacks in DAOs: Static analysis ignores snapshot timing; attackers delegate just before/after to spike power without holding tokens long-term.
+
+Example: Common in Compound/Aave forks; missed in audits until manual review.
+
+
+Bribe Economics in Voting Systems: Tools can't evaluate if bribe markets (e.g., Curve) create perverse incentives for vote selling, leading to protocol capture.
+
+Example: Ongoing in veToken models like Balancer.
+
+
+
+Vault and Token Accounting Errors
+
+Vault Share Inflation via Asset Donations: Scanners don't reason about PPS (price-per-share) dilution from direct transfers bypassing deposit logic.
+
+Example: Yearn Finance clones; $11M in potential losses across forks.
+
+
+Fee-On-Transfer Token Accounting Mismatches: Non-standard ERC-20 behaviors (fees/rebasing) break assumptions in vaults/bridges; tools assume standard transfers.
+
+Example: USDT integrations in early DeFi, causing under-crediting.
+
+
+Rebase Token Assumption Bugs: Tools miss how rebasing (e.g., Ampleforth) affects balance snapshots in staking or lending.
+
+Example: StETH rebasing issues in Aave v2 pools.
+
+
+Rounding/Order-of-Operations Drift in Shares: Integer math asymmetries over repeated ops allow dust accumulation; requires multi-interaction simulation.
+
+Example: Uniswap v2 clones with k-constant rounding exploits.
+
+
+
+Cross-Contract and Composability Issues
+
+Cross-Protocol Composability Exploits: No static tool models state changes across protocols (e.g., skew Curve then call Aave).
+
+Example: Ronin Bridge $625M hack (2022) via multisig composability flaws.
+
+
+Bridge Replay Attacks Across Chains: Tools can't verify finality assumptions or nonce reuse in cross-chain messages.
+
+Example: Nomad Bridge $190M exploit (2022) from replayed proofs.
+
+
+Logical Reentrancy via Token Hooks: ERC-777/1155 callbacks violate invariants without classic reentrancy; needs sequence reasoning.
+
+Example: Uniswap v3 flash loan callbacks gone wrong.
+
+
+
+MEV and Timing Attacks
+
+MEV-Driven Front-Running in Auctions/Liquidations: Scanners don't simulate tx ordering or gas bidding to inflate prices.
+
+Example: NFT marketplace snipes; millions in MEV extracted daily.
+
+
+Timestamp/Block Manipulation for Timing: Validators skew timestamps slightly; tools ignore MEV incentives.
+
+Example: Early vesting unlocks in token launches.
+
+
+
+Upgrade and Proxy Flaws
+
+Proxy Upgrade Storage Collisions: Layout mismatches across versions corrupt data; static tools flag delegatecall but miss bespoke collisions.
+
+Example: OpenZeppelin UUPS proxies in DeFi upgrades.
+
+
+Unprotected Initializers in Upgradables: Multiple init calls seize ownership; requires deployment sequence thinking.
+
+Example: Common in audited but mis-deployed contracts.
+
+
+
+Other Economic and Edge-Case Exploits
+
+Forced Ether Injection via SELFDESTRUCT: Breaks balance invariants (e.g., require(this.balance == total)); tools don't model external code paths.
+
+Example: Parity multisig $280M freeze (2017), still relevant.
+
+
+Permit/EIP-712 Signature Replay: Domain separation flaws allow cross-chain/contract replays; crypto subtleties missed by patterns.
+
+Example: Phishing-resistant permits in DEXes gone wrong.
+
+
+Griefing Attacks in Optimistic Bridges: Spam invalid messages to drain gas/force rollbacks; economic modeling needed, not code patterns.
+
+Example: Optimism/Arb bridges; potential for DoS in high-gas envs.
+
+
+
+These vulns slip past tools because they require:
+
+Economic Modeling: Tools don't simulate incentives or loss estimates.
+Multi-Tx/Block Sequencing: Static analysis is single-contract; dynamic needs custom properties.
+Composability Reasoning: Cross-protocol interactions aren't automated.
+EVM Quirks: Like SELFDESTRUCT or delegatecall semantics in upgrades.
+
+To spot them, devs use manual audits, custom fuzzing (e.g., Foundry invariants), or formal verification (e.g., Certora). For bounties, simulate in a testnet fork to prove impact. If you need PoCs or snippets for any, let me know.
